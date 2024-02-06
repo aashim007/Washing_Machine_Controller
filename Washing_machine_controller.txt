@@ -1,0 +1,87 @@
+-- assumptions i have taken 
+-- i have taken an extra input rst to rst the machine to initial state whenever we make its logic high
+-- coin input will be given 1 and will remain at 1 till the end of machine 
+-- i have used 2 down counters one is to check the cycles till it reach 0 from 512 MHz and another timer which will count time from 123 to 0s
+-- while giving input clock set the time to 1.953125ns so that frequency is equal to 512MHz.
+-- my machine will run at 123 timer only to complete all the states as i have set each state time to a constant time period doesn't set it to a particular range for a particular state
+-- i haven't taken any output for the machine
+
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity MajorProject is
+    Port ( clk : in STD_LOGIC;
+           rst : in STD_LOGIC;
+           coin: in std_logic;
+           lid_open: in std_logic;
+           additional_rinse: in std_logic);
+           --state_out : out std_logic);
+end MajorProject;
+
+architecture Behavioral of MajorProject is
+    type state is (idle,soak,wash,rinse,rinse2,spin,dry);
+    signal counter : STD_LOGIC_VECTOR(28 downto 0) := "11110100001001000000000000000";
+    signal timer: std_logic_vector(6 downto 0) := "1111011";-- timer set to 123
+    signal curr_state,next_state : state;
+begin
+
+    process(clk,lid_open,rst)
+    begin
+        if (rst='1' or timer="0000000") then
+            counter <= (others => '0');
+            timer <= "1111011";
+            --curr_state<=idle;  
+        elsif (lid_open ='1') then
+            counter<=counter;
+            timer<=timer;      
+        elsif (lid_open='0' and rising_edge(clk)and coin='1') then
+            if (counter <= "00000000000000000000000000000") then
+                counter <= "11110100001001000000000000000";
+                timer<= timer - "0000001";  
+            else
+                counter <= counter - "00000000000000000000000000001";
+            end if;
+        end if;
+        
+    end process;
+
+    process(timer,additional_rinse,rst)
+    begin
+        if (rst='1' or timer="0000000") then
+            curr_state<=idle;
+        elsif (additional_rinse='0' and (timer="1111011" or timer="1100011" or timer="1001011" or timer="0110010" or timer ="0011001" ))then
+            curr_state<=next_state;
+        elsif (additional_rinse='1' and (timer="1111011" or timer="1100110" or timer="1010010" or timer="0111101" or timer ="0101001" or timer="0010100"))then
+            curr_state<=next_state;
+        end if;      
+   end process;
+   
+   process(curr_state,additional_rinse,coin,lid_open)
+   begin
+        case curr_state is 
+            when idle=>
+                    next_state<=soak;
+            when soak=>
+                next_state<=wash;  
+            when wash=>
+                next_state<=rinse;
+            when rinse=>
+                if (additional_rinse='1' ) then
+                    next_state<=rinse2;
+                else
+                    next_state<= spin;
+                end if;
+            when rinse2=>
+                next_state<= spin;    
+            when spin=> 
+                next_state<=dry;
+            when dry=>
+                next_state<=idle;                       
+        end case;            
+   end process;
+
+end Behavioral;
